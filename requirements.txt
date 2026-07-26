@@ -14,4 +14,5 @@ python-dotenv~=1.1.1
 PyYAML~=6.0.2
 streamlit
 pypdf
+fastapi
 python-multipart
