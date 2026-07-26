@@ -12,6 +12,5 @@ langchain-text-splitters~=0.3.9
 python-dotenv~=1.1.1
 PyYAML~=6.0.2
 streamlit
-sentence-transformers
 pypdf
 python-multipart

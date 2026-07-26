@@ -12,15 +12,11 @@ from langchain_community.vectorstores import FAISS
 
 from src.core.config import settings
 
-try:
-    from langchain_community.embeddings import HuggingFaceEmbeddings
-    embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
-except Exception:
-    embeddings = OpenAIEmbeddings(
-        model="text-embedding-3-small",
-        openai_api_key=settings.OPENROUTER_API_KEY,
-        openai_api_base=settings.OPENROUTER_BASE_URL,
-    )
+embeddings = OpenAIEmbeddings(
+    model="text-embedding-3-small",
+    openai_api_key=settings.OPENROUTER_API_KEY,
+    openai_api_base=settings.OPENROUTER_BASE_URL,
+)
 
 # Global variable to store the FAISS vectorstore instance
 # This ensures get_retriever() can access documents stored by retriever_chain()
