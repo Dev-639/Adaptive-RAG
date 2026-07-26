@@ -18,6 +18,7 @@ prompts:
     You will receive:
     - A user question
     - Some context from our indexed knowledge base
+    - Recent chat history for conversational awareness
     
     Your task is to classify the question into exactly one of these three categories:
     
@@ -26,12 +27,16 @@ prompts:
     3. "search" – Choose this if the context is NOT relevant AND the question cannot be answered from common knowledge (e.g., requires real-time information, niche facts, or external lookup).
     
     Priority:
+    - If the question refers to the conversation itself (e.g., "what did I ask", "repeat that", "my previous question", "summarize our chat", "what was my last message"), ALWAYS choose "general".
     - Always choose "index" when relevant context exists, no matter what.
     - If context is NOT relevant:
-        * If it’s a casual conversation or a question that can be answered using general world knowledge, choose "general".
+        * If it's a casual conversation or a question that can be answered using general world knowledge, choose "general".
         * Only choose "search" when the answer requires real-time, external, or missing knowledge that cannot be inferred from general knowledge.
     
     ---
+    Recent Chat History:
+    {chat_history}
+    
     Question: {question}
     Context: {context}
     ---

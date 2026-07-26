@@ -32,6 +32,14 @@ def query_classifier(state: State):
         dict: Updated state with route and latest_query.
     """
     question = state["messages"][-1].content
+
+    # Build recent chat history (last 6 messages before current) for context-aware classification
+    recent_messages = state["messages"][-7:-1]
+    chat_history = "\n".join(
+        f"{'User' if msg.type == 'human' else 'Assistant'}: {msg.content[:200]}"
+        for msg in recent_messages if hasattr(msg, 'content') and hasattr(msg, 'type')
+    ) or "No prior conversation."
+
     retriever = get_retriever()
     context = retriever.invoke(question)
     print(f"Retrieved {len(context) if isinstance(context, list) else 'doc'} context chunks for query classification")
@@ -39,10 +47,10 @@ def query_classifier(state: State):
     llm_with_structured_output = llm.with_structured_output(RouteIdentifier)
     classify_prompt = PromptTemplate(
         template=config.prompt("classify_prompt"),
-        input_variables=["question", "context"]
+        input_variables=["question", "context", "chat_history"]
     )
     chain = classify_prompt | llm_with_structured_output
-    result = chain.invoke({"question": question, "context": context})
+    result = chain.invoke({"question": question, "context": context, "chat_history": chat_history})
     print(f"Query classification route: {result.route}")
 
     return {"messages": state["messages"], "route": result.route, "latest_query": question}
