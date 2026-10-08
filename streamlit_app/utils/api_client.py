@@ -4,14 +4,35 @@ API client for communicating with backend services.
 
 import logging
 import os
-
 import requests
 
 logger = logging.getLogger(__name__)
 
-# Backend service URLs
-RUST_BASE_URL = "http://localhost:8080/api"
-PYTHON_BASE_URL = "http://127.0.0.1:8000"
+
+def get_rust_base_url() -> str:
+    """Get the Rust backend base URL from environment or Streamlit secrets."""
+    url = os.getenv("RUST_BASE_URL")
+    if not url:
+        try:
+            import streamlit as st
+            if hasattr(st, "secrets") and "RUST_BASE_URL" in st.secrets:
+                url = st.secrets["RUST_BASE_URL"]
+        except Exception:
+            pass
+    return url or "http://localhost:8080/api"
+
+
+def get_python_base_url() -> str:
+    """Get the Python backend base URL from environment or Streamlit secrets."""
+    url = os.getenv("PYTHON_BASE_URL")
+    if not url:
+        try:
+            import streamlit as st
+            if hasattr(st, "secrets") and "PYTHON_BASE_URL" in st.secrets:
+                url = st.secrets["PYTHON_BASE_URL"]
+        except Exception:
+            pass
+    return url or "http://127.0.0.1:8000"
 
 
 def create_user(username: str, password: str, api_token: str) -> bool:
@@ -26,6 +47,7 @@ def create_user(username: str, password: str, api_token: str) -> bool:
     Returns:
         True if user creation succeeds, False otherwise.
     """
+    rust_url = get_rust_base_url()
     headers = {
         "X-API-TOKEN": api_token,
         "Content-Type": "application/json"
@@ -34,9 +56,10 @@ def create_user(username: str, password: str, api_token: str) -> bool:
 
     try:
         response = requests.post(
-            f"{RUST_BASE_URL}/create_user",
+            f"{rust_url}/create_user",
             json={"username": username, "password": password},
             headers=headers,
+            timeout=10
         )
 
         logger.info("Calling /create_user, status code: %s", response.status_code)
@@ -72,19 +95,24 @@ def login_user(username: str, password: str, api_token: str) -> dict:
     Returns:
         Response dictionary with JWT token if successful, None otherwise.
     """
+    rust_url = get_rust_base_url()
     headers = {
         "X-API-TOKEN": api_token,
         "Content-Type": "application/json"
     }
-    response = requests.post(
-        f"{RUST_BASE_URL}/login",
-        json={"username": username, "password": password},
-        headers=headers,
-    )
-    logger.info("Calling /login, status code: %s", response.json())
+    try:
+        response = requests.post(
+            f"{rust_url}/login",
+            json={"username": username, "password": password},
+            headers=headers,
+            timeout=10
+        )
+        logger.info("Calling /login, status code: %s", response.status_code)
 
-    if response.status_code == 200:
-        return response.json()
+        if response.status_code == 200:
+            return response.json()
+    except requests.RequestException as e:
+        logger.error("Request to /login failed: %s", e)
 
     return None
 
@@ -96,11 +124,15 @@ def get_api_token() -> str:
     Returns:
         API token string if successful, None otherwise.
     """
-    response = requests.post(f"{RUST_BASE_URL}/init")
-    logger.info("Calling /init, status code: %s", response.json())
+    rust_url = get_rust_base_url()
+    try:
+        response = requests.post(f"{rust_url}/init", timeout=5)
+        logger.info("Calling /init, status code: %s", response.status_code)
 
-    if response.status_code == 200:
-        return response.json()["api_token"]
+        if response.status_code == 200:
+            return response.json().get("api_token")
+    except requests.RequestException as e:
+        logger.warning("Connection to auth service at %s failed: %s", rust_url, e)
 
     return None
 
@@ -116,19 +148,25 @@ def query_backend(query: str, session_id: str) -> str:
     Returns:
         Response text from the backend or error message.
     """
-    url = f"{PYTHON_BASE_URL}/rag/query"
+    python_url = get_python_base_url()
+    url = f"{python_url}/rag/query"
     print(f"[query_backend] Calling: {url}")
 
-    response = requests.post(
-        url,
-        json={"query": query, "session_id": session_id},
-        allow_redirects=False
-    )
+    try:
+        response = requests.post(
+            url,
+            json={"query": query, "session_id": session_id},
+            allow_redirects=False,
+            timeout=30
+        )
 
-    if response.status_code == 200:
-        return response.json()["result"]["content"]
-    else:
-        return f"Error: {response.status_code} - {response.text}"
+        if response.status_code == 200:
+            return response.json()["result"]["content"]
+        else:
+            return f"Error: {response.status_code} - {response.text}"
+    except requests.RequestException as e:
+        logger.error("Query backend failed: %s", e)
+        return f"Error connecting to RAG backend service at {python_url}: {str(e)}"
 
 
 def document_upload_rag(file, description: str) -> bool:
@@ -142,17 +180,21 @@ def document_upload_rag(file, description: str) -> bool:
     Returns:
         True if upload succeeds, False otherwise.
     """
+    python_url = get_python_base_url()
     headers = {
         "X-Description": description
     }
-    url = f"{PYTHON_BASE_URL}/rag/documents/upload"
+    url = f"{python_url}/rag/documents/upload"
 
     if file:
-        files = {"file": (file.name, file, file.type)}
-        response = requests.post(url, files=files, headers=headers)
-        print(response)
+        try:
+            files = {"file": (file.name, file, file.type)}
+            response = requests.post(url, files=files, headers=headers, timeout=60)
+            print(response)
 
-        if response.status_code == 200:
-            return True
+            if response.status_code == 200:
+                return True
+        except requests.RequestException as e:
+            logger.error("Document upload failed: %s", e)
 
     return False
