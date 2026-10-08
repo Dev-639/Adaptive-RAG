@@ -42,7 +42,7 @@ if st.session_state.show_logout_confirm:
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
             # Redirect to home page
-            st.switch_page("Home.py")
+            st.switch_page("home.py")
     with col_cancel:
         if st.button("❌ Cancel"):
             st.session_state.show_logout_confirm = False
@@ -82,10 +82,10 @@ with st.sidebar:
         else:
             st.warning("Please describe your document before uploading.")
 
-# Check authentication
+# Ensure session_id is initialized
 if "session_id" not in st.session_state:
-    st.warning("Please login first.")
-    st.stop()
+    import uuid
+    st.session_state["session_id"] = str(uuid.uuid4())
 
 # Initialize chat history
 if "chat_history" not in st.session_state:
@@ -97,7 +97,8 @@ user_input = st.chat_input("Ask a question...")
 # Process user input and get response
 if user_input:
     st.session_state.chat_history.append(("user", user_input))
-    response = query_backend(user_input, st.session_state["jwt_token"])
+    session_id = st.session_state.get("session_id", "default-session")
+    response = query_backend(user_input, session_id)
     st.session_state.chat_history.append(("assistant", response))
     st.rerun()  # Rerun script to display updated messages
 
